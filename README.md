@@ -4,6 +4,10 @@
 
 项目采用纯前端实现，打开 `index.html` 就能使用，不依赖后端服务，也不会把图片上传到服务器。
 
+## 在线预览
+
+访问：[https://hovz-subgen.netlify.app/](https://hovz-subgen.netlify.app/)
+
 ## 作品亮点
 
 - **两种创作模式**：支持单图字幕生成和多图台词拼接。
