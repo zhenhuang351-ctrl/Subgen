@@ -1,0 +1,2030 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片字幕生成器</title>
+<meta name="description" content="一个浏览器端图片字幕生成工具，支持单图字幕、双语字幕、台词长图拼接、样式调整和 PNG 导出。">
+<meta name="theme-color" content="#fbfaf7">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --surface2: #f4f2ed;
+    --border: #e6e2da;
+    --border2: #d6d1c8;
+    --text: #1b1b1b;
+    --text2: #6b6860;
+    --text3: #8a867d;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --green: #16a34a;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    font-size: 14px;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 73px;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  header .badge {
+    font-size: 11px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 0;
+    height: calc(100vh - 73px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+  }
+
+  .panel::-webkit-scrollbar { width: 4px; }
+  .panel::-webkit-scrollbar-track { background: transparent; }
+  .panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .preview-col {
+    background: var(--bg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .sec-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 10px;
+  }
+
+  .upload-box {
+    border: 1.5px dashed var(--border);
+    border-radius: 22px;
+    padding: 26px 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .18s, background .18s, box-shadow .18s, transform .18s;
+    background: rgba(255, 255, 255, .72);
+    display: block;
+  }
+  .upload-box:hover {
+    border-color: var(--border2);
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 12px 30px rgba(27, 27, 27, .06);
+    transform: translateY(-1px);
+  }
+
+  .upload-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .upload-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #f4f2ed;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 400;
+    box-shadow: 0 5px 14px rgba(27, 27, 27, .05);
+  }
+
+  .upload-title {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .upload-subtitle {
+    color: var(--text3);
+    font-size: 12px;
+  }
+
+  .upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s;
+  }
+  .upload-btn:hover { background: var(--accent-hover); }
+
+  .file-name {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 8px;
+  }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+  .style-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .aspect-btn {
+    padding: 9px 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+  }
+
+  .aspect-btn:hover {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  .aspect-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+  }
+
+  .tabs {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 7px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    border-radius: calc(var(--radius-sm) - 2px);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+  }
+
+  .tab:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+  }
+
+  .mode-section,
+  .upload-section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mode-title,
+  .section-label {
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--text);
+    letter-spacing: 0;
+    margin-bottom: 12px;
+  }
+
+  .mode-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mode-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-height: 0;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 650;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, .68);
+    color: var(--text);
+    border-radius: 18px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: border-color .18s, background .18s, box-shadow .18s, transform .18s;
+  }
+
+  .mode-tab:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, .95);
+    border-color: var(--border2);
+    transform: translateY(-1px);
+  }
+
+  .mode-tab.active {
+    background: #fff;
+    color: var(--text);
+    border-color: #1b1b1b;
+    box-shadow: 0 12px 28px rgba(27, 27, 27, .08);
+  }
+
+  .mode-tab-title {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .mode-tab-desc {
+    color: var(--text3);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+
+  .mode-desc {
+    margin-top: 10px;
+    color: var(--text2);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .upload-box.dragover {
+    border-color: var(--text3);
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(27, 27, 27, .08);
+  }
+
+  .image-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .clear-images-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+
+  .clear-images-btn:hover {
+    background: var(--surface2);
+    border-color: var(--border2);
+    color: var(--text);
+  }
+
+  .image-item {
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .image-thumb {
+    width: 42px;
+    height: 42px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: var(--surface2);
+  }
+
+  .image-meta {
+    min-width: 0;
+  }
+
+  .image-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .image-role {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .image-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text2);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+
+  .icon-btn:hover:not(:disabled) {
+    background: var(--surface2);
+    border-color: var(--border2);
+    color: var(--text);
+  }
+
+  .icon-btn:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+  }
+
+
+  .ai-input-box {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .ai-input-box input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .ai-input-box input:focus { border-color: var(--accent); }
+
+  .ai-btn {
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, transform .1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ai-btn:hover { background: var(--accent-hover); }
+  .ai-btn:active { transform: scale(.98); }
+  .ai-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .loading-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+
+  .field label {
+    font-size: 12px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  .field input[type=number],
+  .field input[type=range],
+  .field select {
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color .15s;
+    outline: none;
+    width: 100%;
+  }
+  .field input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    accent-color: #d8dbe2;
+    cursor: pointer;
+  }
+
+  .field input[type=range]::-webkit-slider-runnable-track {
+    -webkit-appearance: none;
+    height: 2px;
+    border-radius: 999px;
+    background: #d8dbe2;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .field input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: #fff;
+    border: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.16);
+  }
+
+  .field input[type=range]::-moz-range-track {
+    height: 2px;
+    border-radius: 999px;
+    background: #d8dbe2;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .field input[type=range]::-moz-range-progress {
+    height: 2px;
+    border-radius: 999px;
+    background: #d8dbe2;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .field input[type=range]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.16);
+  }
+
+  .range-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .range-value {
+    min-width: 34px;
+    text-align: right;
+    font-size: 11px;
+    color: var(--text3);
+    font-variant-numeric: tabular-nums;
+  }
+  .field input[type=number]:focus,
+  .field input[type=range]:focus,
+  .field select:focus { border-color: var(--accent); }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .color-row:hover { border-color: var(--border2); }
+
+  .color-row input[type=color] {
+    width: 22px; height: 22px;
+    border: none; padding: 0;
+    background: none;
+    cursor: pointer;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .color-row span {
+    font-size: 12px;
+    color: var(--text2);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    letter-spacing: .02em;
+  }
+
+  .field textarea {
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 110px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field textarea:focus { border-color: var(--accent); }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .toggle-row input[type=checkbox] {
+    width: 15px; height: 15px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .toggle-row span {
+    font-size: 13px;
+    color: var(--text);
+    user-select: none;
+  }
+
+  .divider { height: 1px; background: var(--border); }
+
+  .btn-row { display: flex; gap: 8px; }
+
+  .btn-primary {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, transform .1s;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:active { transform: scale(.98); }
+
+  .btn-secondary {
+    flex: 1;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-secondary:hover { background: var(--surface2); border-color: var(--border2); }
+
+  .btn-success {
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: none;
+    animation: popIn .2s ease;
+  }
+
+  @keyframes popIn {
+    from { transform: scale(.9); opacity: 0; }
+    to   { transform: scale(1);  opacity: 1; }
+  }
+
+  .preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    background: #1a1917;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .canvas-wrap canvas {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+
+  .empty-hint {
+    text-align: center;
+    color: var(--text3);
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  .empty-hint .icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+    opacity: .4;
+  }
+
+  input[type=file] { display: none; }
+
+  @media (max-width: 768px) {
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 10px 16px;
+      height: 45px;
+    }
+
+    header h1 {
+      font-size: 18px !important;
+      margin-bottom: 0 !important;
+    }
+
+    header p {
+      display: none;
+    }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 45px);
+      overflow: hidden;
+    }
+
+    .preview-col {
+      order: 1;
+      flex: 0 0 44vh;
+      min-height: 230px;
+      max-height: 48vh;
+      padding: 10px;
+      gap: 8px;
+      background: var(--surface);
+    }
+
+    .panel {
+      order: 2;
+      flex: 1 1 56vh;
+      min-height: 0;
+      max-height: none;
+      overflow-y: auto;
+      border-right: 0;
+      border-top: 1px solid var(--border);
+      padding: 12px 14px 78px;
+      gap: 12px;
+      border-radius: 14px 14px 0 0;
+    }
+
+    .sec-label {
+      margin-bottom: 7px;
+    }
+
+    .divider {
+      flex: 0 0 1px;
+    }
+
+    .upload-box {
+      padding: 14px 12px;
+    }
+
+    .field {
+      gap: 4px;
+    }
+
+    .field textarea {
+      min-height: 132px;
+    }
+
+    #subtitleText {
+      min-height: 180px;
+    }
+
+    .field input[type=text],
+    .field input[type=number],
+    .field input[type=range],
+    .field select,
+    .ai-input-box input,
+    .field textarea {
+      min-height: 44px;
+      font-size: 16px;
+    }
+
+    .field input[type=range] {
+      height: 44px;
+    }
+
+    .grid2 .field {
+      min-height: 74px;
+      justify-content: space-between;
+    }
+
+    .mode-tab,
+    .ai-btn,
+    .btn-primary,
+    .btn-secondary,
+    .tab,
+    .aspect-btn {
+      min-height: 44px;
+    }
+
+    .grid3 {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .grid3::-webkit-scrollbar {
+      display: none;
+    }
+
+    .aspect-btn {
+      flex: 0 0 auto;
+      min-width: 76px;
+      padding: 10px 14px;
+      scroll-snap-align: start;
+    }
+
+    .btn-row {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
+      margin: 0;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: rgba(255,255,255,.96);
+      border-top: 1px solid rgba(224, 221, 216, .85);
+      backdrop-filter: blur(14px);
+    }
+
+    .btn-row .btn-primary {
+      font-size: 15px;
+      padding: 12px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center;">
+    <h1 style="font-size: 24px; font-weight: 700; letter-spacing: -0.04em; color: var(--text); margin-bottom: 4px;">图片字幕生成器</h1>
+    <p style="font-size: 14px; color: var(--text2); font-weight: 400; letter-spacing: 0.02em;">一图一字幕，让每一刻都有故事</p>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- 左侧控制面板 -->
+  <div class="panel">
+
+    <div class="mode-section">
+      <div class="mode-title">创作方式</div>
+
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="subtitle" onclick="setAppMode('subtitle')">
+          <span class="mode-tab-title">字幕生成</span>
+          <span class="mode-tab-desc">上传单张图片，输入文字生成电影感字幕图</span>
+        </button>
+        <button class="mode-tab" data-mode="strip" onclick="setAppMode('strip')">
+          <span class="mode-tab-title">台词拼接</span>
+          <span class="mode-tab-desc">首图完整保留，后续仅拼接底部台词条</span>
+        </button>
+      </div>
+
+      <p class="mode-desc" id="modeDesc">
+        上传一张图片，输入文字，生成电影感拼接字幕图。
+      </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="upload-section">
+      <div class="section-label">上传图片</div>
+
+      <label class="upload-box" id="uploadZone" for="fileInput">
+        <div class="upload-inner">
+          <div class="upload-icon">+</div>
+          <div class="upload-title" id="uploadTitle">选择图片</div>
+          <div class="upload-subtitle" id="fileName">支持 JPG / PNG / WebP</div>
+        </div>
+      </label>
+
+      <input type="file" id="fileInput" accept="image/*" multiple>
+      <div class="image-list" id="imageList" style="display:none"></div>
+      <button class="clear-images-btn" id="clearImagesBtn" type="button" onclick="clearAllImages()" style="display:none">清空全部</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <input type="hidden" id="originalSubtitleHeight" value="0">
+    <input type="checkbox" id="detectSubtitle" checked hidden>
+
+    <div id="stripControls" style="display:none">
+      <div class="sec-label">台词条设置</div>
+      <div class="field">
+        <label class="range-label">台词高度 (px)<span class="range-value" id="subtitleStripHeightValue">120</span></label>
+        <input type="range" id="subtitleStripHeight" value="120" min="60" max="260">
+      </div>
+    </div>
+
+    <div class="divider" id="stripDivider" style="display:none"></div>
+
+    <div id="subtitleControls">
+    <!-- 字幕内容 -->
+    <div>
+      <div class="sec-label">字幕内容</div>
+      <div class="tabs">
+        <button class="tab active" data-tab="custom" onclick="switchTab('custom')">自定义</button>
+        <button class="tab" data-tab="ai" onclick="switchTab('ai')">灵感文案</button>
+        <button class="tab" data-tab="bilingual" onclick="switchTab('bilingual')">双语</button>
+      </div>
+      
+      <!-- 自定义输入 -->
+      <div id="customTab" class="tab-content">
+        <div class="field">
+          <textarea id="subtitleText" placeholder="每行输入一条字幕，每行对应一行字幕效果…"></textarea>
+        </div>
+      </div>
+      
+      <!-- 灵感文案 -->
+      <div id="aiTab" class="tab-content" style="display: none;">
+        <div class="field">
+          <label>输入关键词或主题</label>
+          <input type="text" id="aiKeyword" placeholder="例如：风景、美食、情感、励志...">
+        </div>
+        <div class="ai-input-box">
+          <input type="text" id="aiStyle" placeholder="风格（可选）：幽默、文艺、简洁、诗意...">
+          <button class="ai-btn" onclick="generateAI()" id="aiGenerateBtn">
+            <span id="aiBtnText">✨ 生成灵感</span>
+            <span id="aiBtnSpinner" class="loading-spinner" style="display: none;"></span>
+          </button>
+        </div>
+        <div class="field" style="margin-top: 12px;">
+          <textarea id="aiResult" placeholder="灵感文案将显示在这里..." readonly></textarea>
+        </div>
+        <button class="btn-secondary" style="margin-top: 8px; flex: none;" onclick="useAIResult()">使用此文案</button>
+      </div>
+      
+      <!-- 双语字幕 -->
+      <div id="bilingualTab" class="tab-content" style="display: none;">
+        <div class="field">
+          <label>中文（主字幕，上方显示）</label>
+          <textarea id="chineseText" placeholder="输入中文内容，每行对应一句"></textarea>
+        </div>
+        <div class="field" style="margin-top: 10px;">
+          <label>English（英文，下方显示，字号较小）</label>
+          <textarea id="englishText" placeholder="Enter English text, one line per sentence"></textarea>
+        </div>
+        <p style="font-size: 11px; color: var(--text3); margin-top: 8px;">中英文将按行一一对应，中文在上，英文在下（字号为中文的60%）</p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 字幕设置 -->
+    <div>
+      <div class="sec-label">字幕样式设置</div>
+      <div class="style-sliders">
+        <div class="field">
+          <label class="range-label">字幕行高 (px)<span class="range-value" id="lineHeightValue">78</span></label>
+          <input type="range" id="lineHeight" value="78" min="44" max="260">
+        </div>
+        <div class="field">
+          <label class="range-label">字体大小 (px)<span class="range-value" id="fontSizeValue">42</span></label>
+          <input type="range" id="fontSize" value="42" min="20" max="140">
+        </div>
+        <div class="field">
+          <label class="range-label">背景强度<span class="range-value" id="bgOpacityValue">30%</span></label>
+          <input type="range" id="bgOpacity" value="30" min="0" max="100">
+        </div>
+        <div class="field">
+          <label class="range-label">轮廓宽度 (px)<span class="range-value" id="outlineWidthValue">2</span></label>
+          <input type="range" id="outlineWidth" value="2" min="0" max="12">
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:14px">
+        <div class="field">
+          <label>字体颜色</label>
+          <div class="color-row" onclick="document.getElementById('fontColor').click()">
+            <input type="color" id="fontColor" value="#ffffff">
+            <span id="fontColorHex">#FFFFFF</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>轮廓颜色</label>
+          <div class="color-row" onclick="document.getElementById('outlineColor').click()">
+            <input type="color" id="outlineColor" value="#000000">
+            <span id="outlineColorHex">#000000</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:10px">
+        <div class="field">
+          <label>背景颜色</label>
+          <div class="color-row" onclick="document.getElementById('bgColor').click()">
+            <input type="color" id="bgColor" value="#000000">
+            <span id="bgColorHex">#000000</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>字体粗细</label>
+          <select id="fontWeight">
+            <option value="normal" selected>正常</option>
+            <option value="600">半粗体</option>
+            <option value="bold">粗体</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:10px">
+        <label>中文字体</label>
+        <select id="fontFamily">
+          <option value="'Microsoft YaHei','PingFang SC',sans-serif">现代无衬线</option>
+          <option value="'SimSun','Songti SC','Noto Serif SC','Source Han Serif SC',serif">电影感衬线</option>
+          <option value="'SimHei','Noto Sans SC','Helvetica Neue','Microsoft YaHei',sans-serif">纪录片信息体</option>
+          <option value="'KaiTi','Kaiti SC','LXGW WenKai',serif">文艺手写</option>
+          <option value="'Courier New','SF Mono',monospace">打字机风格</option>
+        </select>
+      </div>
+
+      <div class="field" style="margin-top:10px">
+        <label>英文字体</label>
+        <select id="fontFamilyEn">
+          <option value="'SF Pro Display','Helvetica Neue',sans-serif">现代英文</option>
+          <option value="'Georgia','Times New Roman',serif">经典衬线</option>
+          <option value="'Times New Roman',Times,serif">复古电影</option>
+          <option value="'Courier New','SF Mono',monospace">打字机</option>
+        </select>
+      </div>
+
+      <div class="grid2" style="margin-top:10px">
+        <div class="field">
+          <label>文字对齐</label>
+          <select id="textAlign">
+            <option value="center">居中</option>
+            <option value="left">左对齐</option>
+            <option value="right">右对齐</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>英文字号比例 (%)</label>
+          <input type="number" id="englishFontRatio" value="80" min="50" max="120">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:10px">
+        <label>水平内边距 (px)</label>
+        <input type="number" id="paddingX" value="24" min="0" max="200">
+      </div>
+
+      <label class="toggle-row" style="margin-top:12px">
+        <input type="checkbox" id="showDivider">
+        <span>显示分割线</span>
+      </label>
+
+      <div class="grid2" style="margin-top:10px; opacity:.35; pointer-events:none" id="dividerFields">
+        <div class="field">
+          <label>分割线颜色</label>
+          <div class="color-row" onclick="document.getElementById('dividerColor').click()">
+            <input type="color" id="dividerColor" value="#ffffff">
+            <span id="dividerColorHex">#FFFFFF</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>分割线不透明度 (%)</label>
+          <input type="number" id="dividerOpacity" value="35" min="0" max="100">
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 图片比例 -->
+    <div>
+      <div class="sec-label">图片比例</div>
+      <div class="grid3">
+        <button class="aspect-btn active" data-aspect="original" onclick="setAspectRatio('original')">原始</button>
+        <button class="aspect-btn" data-aspect="3:4" onclick="setAspectRatio('3:4')">3:4</button>
+        <button class="aspect-btn" data-aspect="1:1" onclick="setAspectRatio('1:1')">1:1</button>
+        <button class="aspect-btn" data-aspect="9:16" onclick="setAspectRatio('9:16')">9:16</button>
+        <button class="aspect-btn" data-aspect="16:9" onclick="setAspectRatio('16:9')">16:9</button>
+        <button class="aspect-btn" data-aspect="4:3" onclick="setAspectRatio('4:3')">4:3</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 水印设置 -->
+    <div>
+      <div class="sec-label">水印设置</div>
+      <label class="toggle-row">
+        <input type="checkbox" id="enableWatermark">
+        <span>添加水印</span>
+      </label>
+      <div id="watermarkFields" style="opacity: 0.35; pointer-events: none;">
+        <div class="field" style="margin-top: 10px;">
+          <label>水印文字</label>
+          <input type="text" id="watermarkText" value="hovz" placeholder="输入水印文字">
+        </div>
+        <div class="grid2" style="margin-top: 10px;">
+          <div class="field">
+            <label>水印颜色</label>
+            <div class="color-row" onclick="document.getElementById('watermarkColor').click()">
+              <input type="color" id="watermarkColor" value="#ffffff">
+              <span id="watermarkColorHex">#FFFFFF</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>水印大小 (px)</label>
+            <input type="number" id="watermarkSize" value="12" min="8" max="32">
+          </div>
+        </div>
+        <div class="field" style="margin-top: 10px;">
+          <label>水印位置</label>
+          <select id="watermarkPosition">
+            <option value="bottom-right">右下角</option>
+            <option value="bottom-left">左下角</option>
+            <option value="top-right">右上角</option>
+            <option value="top-left">左上角</option>
+            <option value="center">居中</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top: 10px;">
+          <label>水印边距 (px)</label>
+          <input type="number" id="watermarkMargin" value="16" min="0" max="100">
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveImage()">保存图片</button>
+      <button class="btn-success" id="successBtn">图片已保存！</button>
+    </div>
+
+  </div>
+
+  <!-- 右侧预览区 -->
+  <div class="preview-col">
+    <div class="preview-label">预览</div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="empty-hint">
+        <div class="icon">🖼️</div>
+        上传图片<br>即可在此实时预览
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let imgObj = null;
+  let imageItems = [];
+  let appMode = 'subtitle';
+  let currentAspectRatio = 'original';
+  let detectedSubtitleArea = 0;
+  let isGenerating = false;
+  let generateTimer = null;
+  let realtimePreviewInitialized = false;
+
+  function scheduleGenerate() {
+    if (appMode === 'subtitle' && !imgObj) return;
+    if (appMode === 'strip' && imageItems.length === 0) return;
+    clearTimeout(generateTimer);
+    generateTimer = setTimeout(() => {
+      generate();
+    }, 80);
+  }
+
+  function showCanvas(canvas, showSuccess = false) {
+    const wrap = document.getElementById('canvasWrap');
+    wrap.innerHTML = '';
+    canvas.style.maxWidth = '100%';
+    canvas.style.maxHeight = '100%';
+    canvas.style.display = 'block';
+    wrap.appendChild(canvas);
+
+    if (showSuccess) {
+      const btn = document.getElementById('successBtn');
+      btn.style.display = 'inline-block';
+      setTimeout(() => { btn.style.display = 'none'; }, 3000);
+    }
+  }
+
+  function showSuccessMessage() {
+    const btn = document.getElementById('successBtn');
+    btn.style.display = 'inline-block';
+    setTimeout(() => { btn.style.display = 'none'; }, 3000);
+  }
+
+  function showEmptyHint() {
+    document.getElementById('canvasWrap').innerHTML = '<div class="empty-hint"><div class="icon">🖼️</div>上传图片<br>即可在此实时预览</div>';
+  }
+
+  function getImageLayout() {
+    const originalW = imgObj.naturalWidth;
+    const originalH = imgObj.naturalHeight;
+    const aspectSize = getAspectSize(originalW, originalH);
+    const W = aspectSize.width;
+    const H = aspectSize.height;
+    const scale = Math.max(W / originalW, H / originalH);
+    const scaledW = originalW * scale;
+    const scaledH = originalH * scale;
+    const offsetX = (W - scaledW) / 2;
+    const offsetY = (H - scaledH) / 2;
+
+    return { originalW, originalH, W, H, scale, scaledW, scaledH, offsetX, offsetY };
+  }
+
+  function renderOnlyImage() {
+    if (!imgObj) return;
+    const { W, H, scaledW, scaledH, offsetX, offsetY } = getImageLayout();
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgObj, offsetX, offsetY, scaledW, scaledH);
+    showCanvas(canvas, false);
+  }
+
+  function createFirstRowBgCanvas(W, rowHeight, scale, offsetX, offsetY, subStartY, originalW, originalH) {
+    const firstRowBg = document.createElement('canvas');
+    firstRowBg.width = W;
+    firstRowBg.height = rowHeight;
+    const bgCtx = firstRowBg.getContext('2d');
+
+    const sx = Math.max(0, Math.min(originalW - 1, (0 - offsetX) / scale));
+    const sy = Math.max(0, Math.min(originalH - 1, (subStartY - offsetY) / scale));
+    const sw = Math.max(1, Math.min(originalW - sx, W / scale));
+    const sh = Math.max(1, Math.min(originalH - sy, rowHeight / scale));
+
+    bgCtx.drawImage(imgObj, sx, sy, sw, sh, 0, 0, W, rowHeight);
+    return firstRowBg;
+  }
+
+  function setAppMode(mode) {
+    appMode = mode;
+    document.querySelectorAll('[data-mode]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    const isStrip = mode === 'strip';
+    document.getElementById('subtitleControls').style.display = isStrip ? 'none' : 'block';
+    document.getElementById('stripControls').style.display = isStrip ? 'block' : 'none';
+    document.getElementById('stripDivider').style.display = isStrip ? 'block' : 'none';
+    document.getElementById('modeDesc').textContent = isStrip
+      ? '上传多张已有字幕截图，拼接成台词长图。'
+      : '上传一张图片，输入文字，生成电影感拼接字幕图。';
+    updateUploadHint();
+    renderImageList();
+    if (imageItems.length === 0) showEmptyHint();
+    scheduleGenerate();
+  }
+
+  function updateUploadHint() {
+    const fileName = document.getElementById('fileName');
+    if (imageItems.length === 0) {
+      fileName.textContent = appMode === 'strip'
+        ? '点击或拖拽上传截图，可多次追加'
+        : '支持 JPG / PNG / WebP';
+      return;
+    }
+
+    if (appMode === 'strip') {
+      fileName.textContent = `已上传 ${imageItems.length} 张，按列表顺序拼接`;
+    } else {
+      fileName.textContent = imageItems[0].fileName;
+    }
+  }
+
+  function loadImageFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const image = new Image();
+        image.onload = function() {
+          resolve({
+            id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+            fileName: file.name,
+            src: ev.target.result,
+            image
+          });
+        };
+        image.onerror = reject;
+        image.src = ev.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderImageList() {
+    const list = document.getElementById('imageList');
+    const clearBtn = document.getElementById('clearImagesBtn');
+    if (!list) return;
+    list.innerHTML = '';
+    list.style.display = appMode === 'strip' && imageItems.length > 0 ? 'flex' : 'none';
+    if (clearBtn) {
+      clearBtn.style.display = appMode === 'strip' && imageItems.length > 0 ? 'block' : 'none';
+    }
+    if (appMode !== 'strip') return;
+
+    imageItems.forEach((item, index) => {
+      const row = document.createElement('div');
+      row.className = 'image-item';
+
+      const thumb = document.createElement('img');
+      thumb.className = 'image-thumb';
+      thumb.src = item.src;
+      thumb.alt = item.fileName;
+
+      const meta = document.createElement('div');
+      meta.className = 'image-meta';
+      const title = document.createElement('div');
+      title.className = 'image-title';
+      title.textContent = item.fileName;
+      const role = document.createElement('div');
+      role.className = 'image-role';
+      role.textContent = index === 0 ? '首图完整保留' : '底部台词条';
+      meta.appendChild(title);
+      meta.appendChild(role);
+
+      const actions = document.createElement('div');
+      actions.className = 'image-actions';
+      [
+        { text: '↑', title: '上移', disabled: index === 0, action: () => moveImage(index, -1) },
+        { text: '↓', title: '下移', disabled: index === imageItems.length - 1, action: () => moveImage(index, 1) },
+        { text: '×', title: '删除', disabled: false, action: () => removeImage(index) }
+      ].forEach(btnConfig => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'icon-btn';
+        btn.textContent = btnConfig.text;
+        btn.title = btnConfig.title;
+        btn.disabled = btnConfig.disabled;
+        btn.addEventListener('click', btnConfig.action);
+        actions.appendChild(btn);
+      });
+
+      row.appendChild(thumb);
+      row.appendChild(meta);
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+  }
+
+  function moveImage(index, direction) {
+    const target = index + direction;
+    if (target < 0 || target >= imageItems.length) return;
+    const [item] = imageItems.splice(index, 1);
+    imageItems.splice(target, 0, item);
+    imgObj = imageItems[0]?.image || null;
+    renderImageList();
+    updateUploadHint();
+    scheduleGenerate();
+  }
+
+  function removeImage(index) {
+    imageItems.splice(index, 1);
+    imgObj = imageItems[0]?.image || null;
+    renderImageList();
+    updateUploadHint();
+    if (imageItems.length === 0) {
+      showEmptyHint();
+      return;
+    }
+    scheduleGenerate();
+  }
+
+  function clearAllImages() {
+    imageItems = [];
+    imgObj = null;
+    renderImageList();
+    updateUploadHint();
+    showEmptyHint();
+  }
+
+  function renderStripImage() {
+    if (imageItems.length === 0) return;
+
+    const first = imageItems[0].image;
+    const targetW = first.naturalWidth;
+    const firstH = Math.round(first.naturalHeight * (targetW / first.naturalWidth));
+    const subtitleHeight = Math.min(260, Math.max(60, parseInt(getVal('subtitleStripHeight')) || 120));
+    const totalH = firstH + Math.max(0, imageItems.length - 1) * subtitleHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = totalH;
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(first, 0, 0, targetW, firstH);
+
+    let y = firstH;
+    imageItems.slice(1).forEach(item => {
+      const image = item.image;
+      const cropHeight = subtitleHeight;
+      const cropY = image.naturalHeight - cropHeight;
+      const sourceY = Math.max(0, cropY);
+      const sourceHeight = Math.min(cropHeight, image.naturalHeight);
+      ctx.drawImage(
+        image,
+        0,
+        sourceY,
+        image.naturalWidth,
+        sourceHeight,
+        0,
+        y,
+        targetW,
+        subtitleHeight
+      );
+      y += subtitleHeight;
+    });
+
+    showCanvas(canvas, false);
+  }
+
+  /* 文件上传 */
+  async function handleSelectedFiles(fileList) {
+    const files = Array.from(fileList || []).filter(file => file.type.startsWith('image/'));
+    if (files.length === 0) return;
+
+    try {
+      const loadedItems = await Promise.all(files.map(loadImageFile));
+      imageItems = appMode === 'strip'
+        ? imageItems.concat(loadedItems)
+        : loadedItems.slice(0, 1);
+      imgObj = imageItems[0]?.image || null;
+      updateUploadHint();
+      renderImageList();
+      scheduleGenerate();
+    } catch (error) {
+      alert('图片读取失败，请换一张图片再试');
+    }
+  }
+
+  document.getElementById('fileInput').addEventListener('change', async function(e) {
+    await handleSelectedFiles(e.target.files);
+    e.target.value = '';
+  });
+
+  const uploadZone = document.getElementById('uploadZone');
+  uploadZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+  uploadZone.addEventListener('dragleave', function() {
+    uploadZone.classList.remove('dragover');
+  });
+  uploadZone.addEventListener('drop', async function(e) {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    await handleSelectedFiles(e.dataTransfer.files);
+  });
+
+  updateUploadHint();
+
+  /* 颜色同步 */
+  function bindColor(inputId, hexId) {
+    const el = document.getElementById(inputId);
+    el.addEventListener('input', () => {
+      document.getElementById(hexId).textContent = el.value.toUpperCase();
+      scheduleGenerate();
+    });
+  }
+  bindColor('fontColor', 'fontColorHex');
+  bindColor('outlineColor', 'outlineColorHex');
+  bindColor('bgColor', 'bgColorHex');
+  bindColor('dividerColor', 'dividerColorHex');
+  bindColor('watermarkColor', 'watermarkColorHex');
+
+  function bindRangeValue(inputId, valueId, suffix = '') {
+    const el = document.getElementById(inputId);
+    const valueEl = document.getElementById(valueId);
+    if (!el || !valueEl) return;
+
+    const syncValue = () => {
+      valueEl.textContent = `${el.value}${suffix}`;
+      const min = Number(el.min || 0);
+      const max = Number(el.max || 100);
+      const current = Number(el.value);
+      const progress = max > min ? ((current - min) / (max - min)) * 100 : 0;
+      el.style.setProperty('--range-progress', `${progress}%`);
+    };
+
+    syncValue();
+    el.addEventListener('input', syncValue);
+    el.addEventListener('change', syncValue);
+  }
+
+  bindRangeValue('lineHeight', 'lineHeightValue');
+  bindRangeValue('fontSize', 'fontSizeValue');
+  bindRangeValue('bgOpacity', 'bgOpacityValue', '%');
+  bindRangeValue('outlineWidth', 'outlineWidthValue');
+  bindRangeValue('subtitleStripHeight', 'subtitleStripHeightValue');
+
+  /* 实时预览 - 字幕设置修改时自动更新 */
+  const realtimeControls = [
+    'lineHeight', 'fontSize', 'fontFamily', 'fontFamilyEn', 'fontWeight',
+    'englishFontRatio', 'textAlign', 'outlineWidth', 'bgOpacity',
+    'showDivider', 'dividerOpacity', 'paddingX',
+    'enableWatermark', 'watermarkText', 'watermarkSize', 'watermarkPosition', 'watermarkMargin',
+    'originalSubtitleHeight', 'detectSubtitle', 'fontColor', 'outlineColor', 'bgColor', 'dividerColor', 'watermarkColor',
+    'subtitleText', 'chineseText', 'englishText', 'subtitleStripHeight'
+  ];
+  
+  function triggerRealtimePreview() {
+    scheduleGenerate();
+  }
+  
+  function handleRealtimePreview() {
+    scheduleGenerate();
+  }
+
+  function handleFontPreview() {
+    scheduleGenerate();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => scheduleGenerate());
+    }
+  }
+
+  function setupRealtimePreview() {
+    if (realtimePreviewInitialized) return;
+    realtimePreviewInitialized = true;
+
+    realtimeControls.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      if (el.type === 'number') {
+        el.addEventListener('input', handleRealtimePreview);
+        el.addEventListener('change', handleRealtimePreview);
+      } else if (el.tagName === 'SELECT') {
+        el.addEventListener('change', id === 'fontFamily' || id === 'fontFamilyEn' ? handleFontPreview : handleRealtimePreview);
+      } else if (el.type === 'checkbox') {
+        el.addEventListener('change', handleRealtimePreview);
+      } else {
+        el.addEventListener('input', handleRealtimePreview);
+      }
+    });
+  }
+  
+  // 立即初始化实时预览（脚本在body末尾，DOM已加载）
+  setupRealtimePreview();
+  
+  // 同时监听DOMContentLoaded以防脚本位置改变
+  document.addEventListener('DOMContentLoaded', function() {
+    setupRealtimePreview();
+  });
+
+  /* tab切换时也触发预览 */
+  document.querySelectorAll('.tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      scheduleGenerate();
+    });
+  });
+
+  /* 分割线开关 */
+  document.getElementById('showDivider').addEventListener('change', function() {
+    document.getElementById('dividerFields').style.opacity = this.checked ? '1' : '.35';
+    document.getElementById('dividerFields').style.pointerEvents = this.checked ? 'auto' : 'none';
+  });
+
+  /* 水印开关 */
+  document.getElementById('enableWatermark').addEventListener('change', function() {
+    document.getElementById('watermarkFields').style.opacity = this.checked ? '1' : '.35';
+    document.getElementById('watermarkFields').style.pointerEvents = this.checked ? 'auto' : 'none';
+    scheduleGenerate();
+  });
+
+  /* 图片比例选择 */
+  function setAspectRatio(aspect) {
+    currentAspectRatio = aspect;
+    document.querySelectorAll('.aspect-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.aspect-btn[data-aspect="${aspect}"]`).classList.add('active');
+    scheduleGenerate();
+  }
+
+  /* Tab切换 */
+  function switchTab(tabName) {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.tabs .tab[data-tab="${tabName}"]`).classList.add('active');
+    
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    document.getElementById(`${tabName}Tab`).style.display = 'block';
+  }
+
+  /* AI文案生成模板 */
+  const aiTemplates = {
+    '风景': ['山高水远，心自辽阔', '云淡风轻，岁月静好', '远山如黛，近水含烟', '天地悠悠，我心自在'],
+    '美食': ['人间烟火气，最抚凡人心', '味蕾的狂欢，幸福的味道', '一口下去，满满都是爱', '舌尖上的诱惑，挡不住的美味'],
+    '情感': ['时光荏苒，初心不变', '遇见你，是最美的意外', '心若向阳，无畏悲伤', '愿有岁月可回首，且以深情共白头'],
+    '励志': ['心有光芒，必有远方', '以梦为马，不负韶华', '越努力，越幸运', '每一个不曾起舞的日子，都是对生命的辜负'],
+    '旅行': ['身体和灵魂，总有一个在路上', '世界很大，风景很美', '走出去，遇见更好的自己', '旅途漫漫，风景无限'],
+    '文艺': ['岁月静好，现世安稳', '心有诗意，处处清欢', '时光不语，静待花开', '愿你眼中有星辰，心中有山海'],
+    '简约': ['简单生活，快乐时光', 'Less is More', '极简主义，品质生活', '删繁就简，回归本真'],
+    '幽默': ['生活不止眼前的苟且，还有吃不完的火锅', '减肥这种事，明天再说吧', '人生苦短，必须性感', '我不是胖，是可爱到膨胀'],
+    '诗意': ['面朝大海，春暖花开', '春风十里，不如你', '落花人独立，微雨燕双飞', '采菊东篱下，悠然见南山'],
+    '日常': ['平凡的日子，也有光', '生活点滴，皆是美好', '小确幸，大幸福', '每一天，都是新的开始']
+  };
+
+  function generateAI() {
+    const keyword = document.getElementById('aiKeyword').value.trim();
+    const style = document.getElementById('aiStyle').value.trim();
+    
+    if (!keyword) {
+      return;
+    }
+
+    const btn = document.getElementById('aiGenerateBtn');
+    const btnText = document.getElementById('aiBtnText');
+    const spinner = document.getElementById('aiBtnSpinner');
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    spinner.style.display = 'inline-block';
+
+    setTimeout(() => {
+      let results;
+      if (aiTemplates[keyword]) {
+        results = aiTemplates[keyword];
+      } else {
+        const allKeys = Object.keys(aiTemplates);
+        const randomKey = allKeys[Math.floor(Math.random() * allKeys.length)];
+        results = aiTemplates[randomKey];
+      }
+
+      if (style && aiTemplates[style]) {
+        const styleResults = aiTemplates[style];
+        results = [...new Set([...results.slice(0, 2), ...styleResults.slice(0, 2)])];
+      }
+
+      // 临时禁用 aiResult 的实时预览事件
+      const aiResultEl = document.getElementById('aiResult');
+      const oldOnInput = aiResultEl.oninput;
+      const oldOnChange = aiResultEl.onchange;
+      aiResultEl.oninput = null;
+      aiResultEl.onchange = null;
+      
+      document.getElementById('aiResult').value = results.join('\n');
+      
+      // 恢复事件监听
+      aiResultEl.oninput = oldOnInput;
+      aiResultEl.onchange = oldOnChange;
+      
+      btn.disabled = false;
+      btnText.style.display = 'inline';
+      spinner.style.display = 'none';
+    }, 1500);
+  }
+
+  function useAIResult() {
+    const result = document.getElementById('aiResult').value;
+    if (result) {
+      document.getElementById('subtitleText').value = result;
+      switchTab('custom');
+      
+      requestAnimationFrame(scheduleGenerate);
+    }
+  }
+
+  function hexToRgb(hex) {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16)
+    };
+  }
+
+  function getVal(id) { return document.getElementById(id).value; }
+
+  function getAspectSize(originalW, originalH) {
+    if (currentAspectRatio === 'original') {
+      return { width: originalW, height: originalH };
+    }
+    
+    const ratios = { '3:4': 3/4, '1:1': 1, '9:16': 9/16, '16:9': 16/9, '4:3': 4/3 };
+    const targetRatio = ratios[currentAspectRatio];
+    const originalRatio = originalW / originalH;
+    
+    let newW, newH;
+    if (originalRatio > targetRatio) {
+      newH = originalH;
+      newW = Math.round(originalH * targetRatio);
+    } else {
+      newW = originalW;
+      newH = Math.round(originalW / targetRatio);
+    }
+    
+    return { width: newW, height: newH };
+  }
+
+  function getCurrentTab() {
+    const tabs = document.querySelectorAll('.tabs .tab');
+    for (const tab of tabs) {
+      if (tab.classList.contains('active')) {
+        return tab.dataset.tab;
+      }
+    }
+    return 'custom';
+  }
+
+  function drawWatermark(ctx, W, H) {
+    if (!document.getElementById('enableWatermark').checked) return;
+    
+    const watermarkText = getVal('watermarkText');
+    const watermarkColor = getVal('watermarkColor');
+    const watermarkSize = parseInt(getVal('watermarkSize')) || 12;
+    const watermarkPosition = getVal('watermarkPosition');
+    const watermarkMargin = parseInt(getVal('watermarkMargin')) || 16;
+    
+    if (!watermarkText.trim()) return;
+    
+    ctx.font = `${watermarkSize}px 'SF Pro Display','Arial',sans-serif`;
+    ctx.fillStyle = watermarkColor;
+    ctx.textBaseline = 'bottom';
+    
+    const metrics = ctx.measureText(watermarkText);
+    const textWidth = metrics.width;
+    const textHeight = watermarkSize;
+    
+    let x, y;
+    switch (watermarkPosition) {
+      case 'bottom-right':
+        x = W - textWidth - watermarkMargin;
+        y = H - watermarkMargin;
+        break;
+      case 'bottom-left':
+        x = watermarkMargin;
+        y = H - watermarkMargin;
+        break;
+      case 'top-right':
+        x = W - textWidth - watermarkMargin;
+        y = textHeight + watermarkMargin;
+        break;
+      case 'top-left':
+        x = watermarkMargin;
+        y = textHeight + watermarkMargin;
+        break;
+      case 'center':
+        x = (W - textWidth) / 2;
+        y = (H + textHeight) / 2;
+        break;
+    }
+    
+    ctx.fillText(watermarkText, x, y);
+  }
+
+  function generate() {
+    if (isGenerating) return;
+    isGenerating = true;
+
+    try {
+      if (appMode === 'strip') {
+        if (imageItems.length === 0) { alert('请先上传图片'); return; }
+        renderStripImage();
+        return;
+      }
+
+      if (!imgObj) { alert('请先上传一张图片'); return; }
+
+      const currentTab = getCurrentTab();
+      let lines = [];
+      let bilingualPairs = [];
+
+      if (currentTab === 'custom') {
+        lines = getVal('subtitleText').split('\n').filter(l => l.trim());
+      } else if (currentTab === 'ai') {
+        lines = getVal('aiResult').split('\n').filter(l => l.trim());
+      } else if (currentTab === 'bilingual') {
+        const chineseLines = getVal('chineseText').split('\n').filter(l => l.trim());
+        const englishLines = getVal('englishText').split('\n').filter(l => l.trim());
+        const maxLen = Math.max(chineseLines.length, englishLines.length);
+        for (let i = 0; i < maxLen; i++) {
+          bilingualPairs.push({
+            chinese: chineseLines[i] || '',
+            english: englishLines[i] || ''
+          });
+        }
+      }
+
+      if (lines.length === 0 && bilingualPairs.length === 0) {
+        renderOnlyImage();
+        return;
+      }
+
+      const lineH = Math.min(260, Math.max(44, parseInt(getVal('lineHeight')) || 78));
+      const fontSize = Math.min(140, Math.max(20, parseInt(getVal('fontSize')) || 42));
+      const fontColor = getVal('fontColor');
+      const outlineC = getVal('outlineColor');
+      const outlineW = Math.max(0, parseInt(getVal('outlineWidth')) || 2);
+      const bgColor = getVal('bgColor');
+      const bgOpacityValue = parseInt(getVal('bgOpacity'));
+      const bgOpacity = Math.min(100, Math.max(0, Number.isNaN(bgOpacityValue) ? 30 : bgOpacityValue)) / 100;
+      const fontFam = getVal('fontFamily');
+      const fontFamEn = getVal('fontFamilyEn');
+      const fontWt = getVal('fontWeight');
+      const englishRatio = Math.min(120, Math.max(50, parseInt(getVal('englishFontRatio')) || 80)) / 100;
+      const textAlign = getVal('textAlign');
+      const paddingX = Math.max(0, parseInt(getVal('paddingX')) || 24);
+      const showDiv = document.getElementById('showDivider').checked;
+      const divColor = getVal('dividerColor');
+      const divOpacityValue = parseInt(getVal('dividerOpacity'));
+      const divOp = Math.min(100, Math.max(0, Number.isNaN(divOpacityValue) ? 35 : divOpacityValue)) / 100;
+      const manualSubtitleHeight = parseInt(getVal('originalSubtitleHeight')) || 0;
+      const subtitleAreaOffset = manualSubtitleHeight > 0 ? manualSubtitleHeight : detectedSubtitleArea;
+
+      const { originalW, originalH, W, H, scale, scaledW, scaledH, offsetX, offsetY } = getImageLayout();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      ctx.drawImage(imgObj, offsetX, offsetY, scaledW, scaledH);
+
+      const bgRgb = hexToRgb(bgColor);
+      const outlineRgb = hexToRgb(outlineC);
+      const divRgb = hexToRgb(divColor);
+
+      if (currentTab === 'bilingual' && bilingualPairs.length > 0) {
+        const bilingualLineH = Math.floor(lineH * 1.6);
+        const englishFontSize = Math.max(10, Math.floor(fontSize * englishRatio));
+        const totalHeight = bilingualPairs.length * bilingualLineH;
+        const subStartY = Math.max(0, H - totalHeight - subtitleAreaOffset);
+        const gradientHeight = Math.max(totalHeight * 1.5, H * 0.2);
+        const gradientStartY = Math.max(0, subStartY - (gradientHeight - totalHeight));
+
+        const gradient = ctx.createLinearGradient(0, gradientStartY, 0, H);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.1)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, gradientStartY, W, gradientHeight);
+
+        const rowBgOpacity = bgOpacity * 0.4;
+        const firstRowBg = createFirstRowBgCanvas(W, bilingualLineH, scale, offsetX, offsetY, subStartY, originalW, originalH);
+        bilingualPairs.forEach((pair, i) => {
+          const rowY = subStartY + i * bilingualLineH;
+          const fullHeight = bilingualLineH;
+
+          ctx.drawImage(firstRowBg, 0, rowY);
+
+          ctx.fillStyle = `rgba(${bgRgb.r},${bgRgb.g},${bgRgb.b},${rowBgOpacity})`;
+          ctx.fillRect(0, rowY, W, fullHeight);
+
+          if (showDiv && i > 0) {
+            ctx.save();
+            ctx.strokeStyle = `rgba(${divRgb.r},${divRgb.g},${divRgb.b},${divOp})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(paddingX * 2, rowY);
+            ctx.lineTo(W - paddingX * 2, rowY);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.textBaseline = 'middle';
+          let tx;
+          if (textAlign === 'center') { ctx.textAlign = 'center'; tx = W / 2; }
+          else if (textAlign === 'left') { ctx.textAlign = 'left'; tx = paddingX; }
+          else { ctx.textAlign = 'right'; tx = W - paddingX; }
+
+          if (pair.chinese) {
+            const chineseTy = rowY + fullHeight * 0.38;
+            ctx.font = `${fontWt} ${fontSize}px ${fontFam}`;
+            if (outlineW > 0) {
+              ctx.strokeStyle = `rgba(${outlineRgb.r},${outlineRgb.g},${outlineRgb.b},0.6)`;
+              ctx.lineWidth = outlineW * 3;
+              ctx.lineJoin = 'round';
+              ctx.strokeText(pair.chinese, tx, chineseTy);
+            }
+            ctx.fillStyle = fontColor;
+            ctx.fillText(pair.chinese, tx, chineseTy);
+          }
+
+          if (pair.english) {
+            const englishTy = rowY + fullHeight * 0.75;
+            ctx.font = `${fontWt} ${englishFontSize}px ${fontFamEn}`;
+            if (outlineW > 0) {
+              ctx.strokeStyle = `rgba(${outlineRgb.r},${outlineRgb.g},${outlineRgb.b},0.6)`;
+              ctx.lineWidth = outlineW * 2.5;
+              ctx.lineJoin = 'round';
+              ctx.strokeText(pair.english, tx, englishTy);
+            }
+            ctx.fillStyle = fontColor;
+            ctx.fillText(pair.english, tx, englishTy);
+          }
+        });
+      } else {
+        const totalHeight = lines.length * lineH;
+        const subStartY = Math.max(0, H - totalHeight - subtitleAreaOffset);
+        const gradientHeight = Math.max(totalHeight * 1.5, H * 0.2);
+        const gradientStartY = Math.max(0, subStartY - (gradientHeight - totalHeight));
+
+        const gradient = ctx.createLinearGradient(0, gradientStartY, 0, H);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.1)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, gradientStartY, W, gradientHeight);
+
+        const rowBgOpacity = bgOpacity * 0.4;
+        const firstRowBg = createFirstRowBgCanvas(W, lineH, scale, offsetX, offsetY, subStartY, originalW, originalH);
+        lines.forEach((line, i) => {
+          const rowY = subStartY + i * lineH;
+
+          ctx.drawImage(firstRowBg, 0, rowY);
+
+          ctx.fillStyle = `rgba(${bgRgb.r},${bgRgb.g},${bgRgb.b},${rowBgOpacity})`;
+          ctx.fillRect(0, rowY, W, lineH);
+
+          if (showDiv && i > 0) {
+            ctx.save();
+            ctx.strokeStyle = `rgba(${divRgb.r},${divRgb.g},${divRgb.b},${divOp})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(paddingX * 2, rowY);
+            ctx.lineTo(W - paddingX * 2, rowY);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.font = `${fontWt} ${fontSize}px ${fontFam}`;
+          ctx.textBaseline = 'middle';
+
+          let tx;
+          if (textAlign === 'center') { ctx.textAlign = 'center'; tx = W / 2; }
+          else if (textAlign === 'left') { ctx.textAlign = 'left'; tx = paddingX; }
+          else { ctx.textAlign = 'right'; tx = W - paddingX; }
+
+          const ty = rowY + lineH / 2;
+
+          if (outlineW > 0) {
+            ctx.strokeStyle = `rgba(${outlineRgb.r},${outlineRgb.g},${outlineRgb.b},0.6)`;
+            ctx.lineWidth = outlineW * 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(line, tx, ty);
+          }
+          ctx.fillStyle = fontColor;
+          ctx.fillText(line, tx, ty);
+        });
+      }
+
+      drawWatermark(ctx, W, H);
+
+      showCanvas(canvas, false);
+    } finally {
+      isGenerating = false;
+    }
+  }
+
+  function saveImage() {
+    if (appMode === 'strip' && imageItems.length === 0) {
+      alert('请先上传图片');
+      return;
+    }
+
+    if (appMode === 'subtitle' && !imgObj) {
+      alert('请先上传图片');
+      return;
+    }
+
+    clearTimeout(generateTimer);
+    generate();
+
+    const canvas = document.querySelector('#canvasWrap canvas');
+    if (!canvas) { alert('请先生成图片'); return; }
+    const a = document.createElement('a');
+    a.download = (appMode === 'strip' ? 'subtitle_strip_' : 'subtitle_') + Date.now() + '.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    showSuccessMessage();
+  }
+</script>
+</body>
+</html>
+
+
